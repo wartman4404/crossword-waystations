@@ -42,6 +42,7 @@ impl<T> Grid<T> {
     else if p.y < 0 || p.y >= self.height { false }
     else { true }
   }
+  #[allow(dead_code)]
   #[inline(always)] fn get_point(& self, p: Point) -> Option<Point> {
     if self.is_valid(p) { Some(p) }
     else                  { None    }
@@ -58,7 +59,6 @@ impl<T> Grid<T> {
     if self.is_valid(p) { Some(& mut self.tiles[self.height * p.y + p.x]) }
     else { None }
   }
-  #[allow(dead_code)] // this code is very much not dead
   fn map<U>(& self, map: |&T|->U)->Grid<U> {
     let mapped: ~[U] = self.tiles.map(map);
     Grid { width: self.width, height: self.height, tiles: mapped }
@@ -83,26 +83,21 @@ impl std::fmt::Show for StringGrid {
 }
 
 impl<'a> Grid<TileData<'a>> {
-  fn neighbor_opt(& self, p: Point) -> [Option<Point>, ..4] {
+  fn neighbors<'b>(& self, p: Point, invec: &'b mut [Point, ..4]) -> &'b [Point] {
     let offsets = [
       p.offset(-1, 0),
       p.offset( 1, 0),
       p.offset( 0,-1),
       p.offset( 0, 1)
     ];
-    let mut ret: [Option<Point>, ..4] = [None, ..4];
-    for (&offset, opt) in offsets.iter().zip(ret.mut_iter()) {
-      *opt = self.get_point(offset);
+    let mut i = 0;
+    for &offset in offsets.iter() {
+      if self.is_valid(offset) {
+        invec[i] = offset;
+        i += 1;
+      }
     }
-    ret
-  }
-
-  #[allow(dead_code)]
-  fn neighbors(& self, p: Point) -> ~[Point] {
-    let opts = self.neighbor_opt(p);
-    opts.flat_map(|p| {
-      p.move_iter().collect::<~[Point]>()
-    })
+    invec.slice_to(i)
   }
 
   #[allow(dead_code)]
@@ -245,13 +240,11 @@ fn allpaths<'a>(grid: & CrosswordGrid<'a>, word: &'a str, start: Point, dest: Po
 fn allpaths2<'a>(grid: & CrosswordGrid<'a>, word: &'a str, start: Point, dest: Point, s: &'a str, accum: &mut ~[CrosswordGrid<'a>]) {
   let mystring: & str = s.slice_from(1);
 
-  let neighbors = grid.neighbor_opt(start);
-  for &i in neighbors.iter() { match i {
-    Some(p) => {
+  let mut tmpvec = [Point { x: 0, y: 0}, ..4];
+  let neighbors = grid.neighbors(start, &mut tmpvec);
+  for &p in neighbors.iter() {
       allpaths(grid, word, p, dest, mystring, accum);
-    }
-    None => { }
-  }}
+  }
 }
 
 fn word_to_path(gridmap: &HashMap<char, Point>, word: &str) -> (Point, Point) {
