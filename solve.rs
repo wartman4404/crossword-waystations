@@ -283,12 +283,14 @@ fn main() {
   let gridmap: HashMap<char, Point> = hashgrid(blankgrid.clone());
   let paths: &[(Point, Point)] = words.map(|word| word_to_path(&gridmap, *word));
   println!("loaded {} words!", words.len());
-  let worditer = words.iter().map(|x| x.as_slice());
-  let wordpts = worditer.zip(paths.iter()).to_owned_vec();
-  let results = add_word(~[blankgrid.clone()], wordpts.as_slice());
-  println!("{}", results.flatten());
-  for w in words.iter() {
-    println!("Showing only \"{}\":", *w);
-    println!("{}", results.flattenWord(*w));
+  for _ in range(0, std::int::parse_bytes(args[3].as_bytes(), 10).unwrap()) {
+    let worditer = words.iter().map(|x| x.as_slice());
+    let wordpts = worditer.zip(paths.iter()).to_owned_vec();
+    let results = add_word(~[blankgrid.clone()], wordpts.as_slice());
+    println!("{}", results.flatten());
+    for w in words.iter() {
+      println!("Showing only \"{}\":", *w);
+      println!("{}", results.flattenWord(*w));
+    }
   }
 }

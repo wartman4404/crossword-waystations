@@ -40,7 +40,6 @@ object Main {
       newgrid
     }
   }
-
   implicit class CrosswordGridExt(grid: Grid[TileData]) {
     def neighbors(p: Point) = {
       Array(
@@ -212,13 +211,15 @@ object Main {
     val gridmap = hashgrid(blankgrid)
     val paths: Array[(Point, Point)] = words.map(word => word_to_path(gridmap, word))
     println("loaded %d words!".format(words.length))
-    val wordpts = words.zip(paths)
-    val results = add_word(Buffer(blankgrid), wordpts)
-    println("%s".format(results.flattenAsCrossword()))
+    for (_ <- 0 to args(2).toInt) {
+      val wordpts = words.zip(paths)
+      val results = add_word(Buffer(blankgrid), wordpts)
+      println("%s".format(results.flattenAsCrossword()))
 
-    for (w <- words) {
-      println("""Showing only "%s":""".format(w))
-      println("%s".format(results.flattenWord(w)))
+      for (w <- words) {
+        println("""Showing only "%s":""".format(w))
+        println("%s".format(results.flattenWord(w)))
+      }
     }
   }
 }
