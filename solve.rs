@@ -21,7 +21,7 @@ struct Point {
 struct Grid<T> {
   width: int,
   height: int,
-  tiles: ~[T]
+  tiles: Vec<T>
 }
 
 type CrosswordGrid<'a> = Grid<TileData<'a>>;
@@ -45,22 +45,22 @@ impl<T> Grid<T> {
   #[allow(dead_code)]
   #[inline(always)] fn get_point(& self, p: Point) -> Option<Point> {
     if self.is_valid(p) { Some(p) }
-    else                  { None    }
+    else                { None    }
   }
   #[inline(always)] fn set(& mut self, p: Point, data: T) {
-    self.tiles[self.height * p.y + p.x] = data;
+    *self.tiles.get_mut((self.height * p.y + p.x) as uint) = data;
   }
   #[inline(always)] fn get_ref<'a>(&'a self, p: Point) -> Option<&'a T> {
-    if self.is_valid(p) { Some(& self.tiles[self.height * p.y + p.x]) }
+    if self.is_valid(p) { Some(self.tiles.get((self.height * p.y + p.x) as uint)) }
     else { None }
   }
   #[allow(dead_code)]
   #[inline] fn get_mut_ref<'a>(&'a mut self, p: Point) -> Option<&'a mut T> {
-    if self.is_valid(p) { Some(& mut self.tiles[self.height * p.y + p.x]) }
+    if self.is_valid(p) { Some(self.tiles.get_mut((self.height * p.y + p.x) as uint)) }
     else { None }
   }
   fn map<U>(& self, map: |&T|->U)->Grid<U> {
-    let mapped: ~[U] = self.tiles.map(map);
+    let mapped: Vec<U> = self.tiles.iter().map(map).collect();
     Grid { width: self.width, height: self.height, tiles: mapped }
   }
 }
@@ -75,8 +75,8 @@ impl<T: Clone> Grid<T> {
 
 impl std::fmt::Show for StringGrid {
   fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
-    let iter = self.tiles.chunks(self.width as uint);
-    let pieces: ~[~str] = iter.map(|x| std::str::from_chars(x)).collect();
+    let iter = self.tiles.as_slice().chunks(self.width as uint);
+    let pieces: Vec<~str> = iter.map(|x| std::str::from_chars(x)).collect();
     let string = pieces.connect("\n");
     write!(fmt.buf, "{}", string)
   }
@@ -111,25 +111,25 @@ trait FlattenCrossword {
   fn flattenWord(&self, &str) -> StringGrid;
 }
 
-impl<'a> FlattenCrossword for ~[CrosswordGrid<'a>] {
+impl<'a> FlattenCrossword for Vec<CrosswordGrid<'a>> {
   fn flatten(&self) -> StringGrid {
-    let mut iter = self.iter().map(|x| x.tiles.map(default_char));
-    let next: ~[char] = iter.next().unwrap();
+    let mut iter = self.iter().map(|x| x.tiles.iter().map(default_char).collect::<Vec<char>>());
+    let next = iter.next().unwrap();
     let folded = iter.fold(next, |accum, x| {
       accum.iter().zip(x.iter()).map(|(&a, &b)| {
         if a == b {  a  }
         else        { ' ' }
-      }).to_owned_vec()
+      }).collect::<Vec<char>>()
     });
-    Grid { width: self[0].width, height: self[0].height, tiles: folded }
+    Grid { width: self.get(0).width, height: self.get(0).height, tiles: folded }
   }
   fn flattenWord(&self, s: &str) -> StringGrid {
-    let mapped = self.map(|x| x.map(|&tile| match tile {
+    let mapped: Vec<CrosswordGrid<'a>> = self.iter().map(|x| x.map(|&tile| match tile {
       OneWord(_, word) if word == s => tile,
       TwoWords(_, a, b) if a == s || b == s => tile,
       Fixed(_) => tile,
       _ => NoWords
-    }));
+    })).collect();
     mapped.flatten()
   }
 }
@@ -157,34 +157,34 @@ impl Case for char {
   }
 }
 
-fn readlines(file: &str) -> ~[~str] {
+fn readlines(file: &str) -> Vec<~str> {
   let path = Path::new(file);
   let input = File::open(&path).read_to_end().unwrap();
-  let text = std::str::from_utf8(input).unwrap();
+  let text = std::str::from_utf8(input.as_slice()).unwrap();
   text.lines_any().map(|line| line.into_owned()).collect()
 }
 
 fn readgrid(file: &str) -> ~CrosswordGrid {
   let lines = readlines(file);
   let longest = lines.iter().map(|a| a.char_len()).max().unwrap();
-  let mut full: ~str = ~"";
+  let mut full = StrBuf::new();
   for line in lines.iter() {
     full.push_str(*line);
   }
-  let downcase = full.to_ascii_lower();
+  let downcase = full.into_owned().to_ascii_lower();
   let mut tileit = downcase
   .chars()
   .map(|c| match c {
     ' ' => NoWords,
     _   => Fixed(c)
   });
-  let tiles: ~[TileData] = tileit.collect();
+  let tiles: Vec<TileData> = tileit.collect();
   ~Grid { width: longest as int, height: lines.len() as int, tiles: tiles }
 }
 
-fn readwords(file: &str) -> ~[~str] {
+fn readwords(file: &str) -> Vec<~str> {
   let lines = readlines(file);
-  lines.map(|x| x.to_ascii_lower())
+  lines.iter().map(|x| x.to_ascii_lower()).collect::<Vec<~str>>()
 }
 
 fn hashgrid(grid: CrosswordGrid) -> HashMap<char, Point> {
@@ -210,7 +210,7 @@ fn hashgrid(grid: CrosswordGrid) -> HashMap<char, Point> {
   map
 }
 
-fn allpaths<'a>(grid: & CrosswordGrid<'a>, word: &'a str, start: Point, dest: Point, s: &'a str, accum: &mut ~[CrosswordGrid<'a>]) {
+fn allpaths<'a>(grid: & CrosswordGrid<'a>, word: &'a str, start: Point, dest: Point, s: &'a str, accum: &mut Vec<CrosswordGrid<'a>>) {
   let len = s.len() as int - 1;
   if start == dest && len == 0 {
     accum.push(grid.clone());
@@ -237,7 +237,7 @@ fn allpaths<'a>(grid: & CrosswordGrid<'a>, word: &'a str, start: Point, dest: Po
   }
 }
 
-fn allpaths2<'a>(grid: & CrosswordGrid<'a>, word: &'a str, start: Point, dest: Point, s: &'a str, accum: &mut ~[CrosswordGrid<'a>]) {
+fn allpaths2<'a>(grid: & CrosswordGrid<'a>, word: &'a str, start: Point, dest: Point, s: &'a str, accum: &mut Vec<CrosswordGrid<'a>>) {
   let mystring: & str = s.slice_from(1);
 
   let mut tmpvec = [Point { x: 0, y: 0}, ..4];
@@ -255,14 +255,14 @@ fn word_to_path(gridmap: &HashMap<char, Point>, word: &str) -> (Point, Point) {
   (*start, *end)
 }
 
-fn add_word<'a>(accum: ~[CrosswordGrid<'a>], wordpt: &[(&'a str, &(Point, Point))])-> ~[CrosswordGrid<'a>] {
+fn add_word<'a>(accum: Vec<CrosswordGrid<'a>>, wordpt: &[(&'a str, &(Point, Point))])-> Vec<CrosswordGrid<'a>> {
   let next = wordpt.head();
   if next.is_none() {
     accum
   } else {
     let (word, &(start, end)) = *next.unwrap();
     println!("searching \"{}\" on {} grids", word, accum.len());
-    let mut out: ~[CrosswordGrid] = ~[];
+    let mut out: Vec<CrosswordGrid> = Vec::new();
     for i in accum.iter() {
       allpaths2(i, word, start, end, word, &mut out);
     }
@@ -281,12 +281,12 @@ fn main() {
   let mut words = readwords(args[2]);
   words.sort_by(|a,b| a.len().cmp(&b.len()));
   let gridmap: HashMap<char, Point> = hashgrid(blankgrid.clone());
-  let paths: &[(Point, Point)] = words.map(|word| word_to_path(&gridmap, *word));
+  let paths: Vec<(Point, Point)> = words.iter().map(|word| word_to_path(&gridmap, *word)).collect();
   println!("loaded {} words!", words.len());
   for _ in range(0, std::int::parse_bytes(args[3].as_bytes(), 10).unwrap()) {
     let worditer = words.iter().map(|x| x.as_slice());
-    let wordpts = worditer.zip(paths.iter()).to_owned_vec();
-    let results = add_word(~[blankgrid.clone()], wordpts.as_slice());
+    let wordpts: Vec<(&str, &(Point, Point))> = worditer.zip(paths.iter()).collect();
+    let results = add_word(vec!(blankgrid.clone()), wordpts.as_slice());
     println!("{}", results.flatten());
     for w in words.iter() {
       println!("Showing only \"{}\":", *w);
