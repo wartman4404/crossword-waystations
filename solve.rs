@@ -78,7 +78,7 @@ impl std::fmt::Show for StringGrid {
     let iter = self.tiles.as_slice().chunks(self.width as uint);
     let pieces: Vec<~str> = iter.map(|x| std::str::from_chars(x)).collect();
     let string = pieces.connect("\n");
-    write!(fmt.buf, "{}", string)
+    write!(fmt, "{}", string)
   }
 }
 
@@ -164,7 +164,7 @@ fn readlines(file: &str) -> Vec<~str> {
   text.lines_any().map(|line| line.into_owned()).collect()
 }
 
-fn readgrid(file: &str) -> ~CrosswordGrid {
+fn readgrid(file: &str) -> Box<CrosswordGrid> {
   let lines = readlines(file);
   let longest = lines.iter().map(|a| a.char_len()).max().unwrap();
   let mut full = StrBuf::new();
@@ -179,7 +179,7 @@ fn readgrid(file: &str) -> ~CrosswordGrid {
     _   => Fixed(c)
   });
   let tiles: Vec<TileData> = tileit.collect();
-  ~Grid { width: longest as int, height: lines.len() as int, tiles: tiles }
+  box Grid { width: longest as int, height: lines.len() as int, tiles: tiles }
 }
 
 fn readwords(file: &str) -> Vec<~str> {
@@ -277,13 +277,13 @@ fn add_word<'a>(accum: Vec<CrosswordGrid<'a>>, wordpt: &[(&'a str, &(Point, Poin
 
 fn main() {
   let args = std::os::args();
-  let blankgrid = *readgrid(args[1]);
-  let mut words = readwords(args[2]);
+  let blankgrid = *readgrid(args.get(1).as_slice());
+  let mut words = readwords(args.get(2).as_slice());
   words.sort_by(|a,b| a.len().cmp(&b.len()));
   let gridmap: HashMap<char, Point> = hashgrid(blankgrid.clone());
   let paths: Vec<(Point, Point)> = words.iter().map(|word| word_to_path(&gridmap, *word)).collect();
   println!("loaded {} words!", words.len());
-  for _ in range(0, std::int::parse_bytes(args[3].as_bytes(), 10).unwrap()) {
+  for _ in range(0, std::int::parse_bytes(args.get(3).as_bytes(), 10).unwrap()) {
     let worditer = words.iter().map(|x| x.as_slice());
     let wordpts: Vec<(&str, &(Point, Point))> = worditer.zip(paths.iter()).collect();
     let results = add_word(vec!(blankgrid.clone()), wordpts.as_slice());
